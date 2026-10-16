@@ -9,9 +9,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from .config import Config
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +45,7 @@ def _resample(pcm: np.ndarray, src_rate: int, dst_rate: int) -> np.ndarray:
 
 
 class Speaker:
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg: Config) -> None:
         from piper.voice import PiperVoice
 
         voice_path = cfg.path("tts", "voice_path")

@@ -1,11 +1,41 @@
 # Pico — local voice assistant server
 
+[![CI](https://github.com/kumarisback/pico-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/kumarisback/pico-assistant/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Fully local, no API keys. Runs on an Acer Nitro 5 (GTX 1050 Ti 4 GB, 8 GB RAM).
 The ESP32-S3 is just a microphone and a speaker on a websocket — all the
 intelligence lives here, so the firmware can be added last.
 
 ```
 ESP32-S3 / mic_client ──ws──> server ──> VAD ──> Whisper ──> Qwen3-4B + tools ──> Piper ──> audio back
+```
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/HLD.md](docs/HLD.md) | Architecture, component choices, resource budget, latency targets |
+| [docs/LLD.md](docs/LLD.md) | Module internals, wire protocol, database schema, ESP32 contract |
+
+## Layout
+
+```
+server/          assistant server
+  config.py        YAML + env configuration
+  vad.py           silero endpointer
+  stt.py           faster-whisper
+  llm.py           agent loop and tool dispatch
+  tts.py           Piper streaming synthesis
+  memory.py        SQLite + embeddings
+  scheduler.py     reminder polling
+  main.py          WebSocket server
+  tools/           tool registry and implementations
+clients/         chat_client (text) and mic_client (audio)
+scripts/         setup, model downloads, llama-server launcher
+docs/            HLD and LLD
+tests/           offline unit tests
 ```
 
 ## Why these choices
@@ -26,9 +56,12 @@ not all ship wheels for 3.13+, and building them from source is not worth it.
 
 ```bash
 cd ~/workspace/assistant
-PY=python3.12 bash scripts/setup.sh        # venv + deps + VAD/TTS models
-bash scripts/download-models.sh --llm      # 2.4 GB Qwen3-4B GGUF
+make setup          # venv + dependencies + VAD/TTS models
+make models-llm     # 2.4 GB Qwen3-4B GGUF
 ```
+
+`make help` lists every target. Without `make`, the equivalent scripts are
+`bash scripts/setup.sh` and `bash scripts/download-models.sh --llm`.
 
 <details>
 <summary>Windows PowerShell</summary>
@@ -55,10 +88,10 @@ export LLAMA_SERVER=$PWD/build/bin/llama-server
 Three terminals:
 
 ```bash
-bash scripts/run-llama.sh        # 1. LLM        :8081
-python -m server.main            # 2. assistant  :8080
-python -m clients.chat_client    # 3. type to it
-python -m clients.mic_client     #    or talk to it
+make llama      # 1. LLM        :8081
+make server     # 2. assistant  :8080
+make chat       # 3. type to it
+make mic        #    or talk to it
 ```
 
 Start with `chat_client`. It skips STT and TTS entirely, so when something is
@@ -127,10 +160,12 @@ is a room bug.
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest tests -q
+make test       # offline — no models, no network, no llama-server
+make lint       # ruff
+make fmt        # ruff fix + format
 ```
 
-Offline only — no models, no network, no llama-server.
+CI runs both on Python 3.11 and 3.12 for every push and pull request.
 
 ## Not done yet
 

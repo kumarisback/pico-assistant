@@ -9,9 +9,14 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
+
+if TYPE_CHECKING:
+    from .config import Config
+    from .memory import Memory
+    from .tools import ToolRegistry
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +24,7 @@ _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
 class Agent:
-    def __init__(self, cfg, registry, memory) -> None:
+    def __init__(self, cfg: Config, registry: ToolRegistry, memory: Memory) -> None:
         self._cfg = cfg
         self._registry = registry
         self._memory = memory

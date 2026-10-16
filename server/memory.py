@@ -12,10 +12,14 @@ import logging
 import sqlite3
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from .config import Config
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders (fired, fire_at);
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 @dataclass
@@ -64,7 +68,7 @@ class Note:
 
 
 class Memory:
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg: Config) -> None:
         db_path = Path(cfg.path("memory", "db_path"))
         db_path.parent.mkdir(parents=True, exist_ok=True)
 

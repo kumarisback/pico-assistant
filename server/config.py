@@ -23,7 +23,7 @@ class Config:
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "Config":
+    def load(cls, path: Path | None = None) -> Config:
         cfg_path = path or ROOT / "config.yaml"
         with open(cfg_path, encoding="utf-8") as fh:
             raw = yaml.safe_load(fh)

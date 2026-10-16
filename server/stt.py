@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 from faster_whisper import WhisperModel
+
+if TYPE_CHECKING:
+    from .config import Config
 
 log = logging.getLogger(__name__)
 
 
 class Transcriber:
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg: Config) -> None:
         s = cfg["stt"]
         self._beam_size = int(s["beam_size"])
         download_root = str(cfg.path("stt", "download_root"))

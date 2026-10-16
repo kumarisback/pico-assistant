@@ -8,9 +8,14 @@ durable store. Polling every few seconds is accurate enough for spoken reminders
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .memory import Memory
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +25,7 @@ PushFn = Callable[[str], Awaitable[None]]
 
 
 class ReminderService:
-    def __init__(self, memory, push: PushFn) -> None:
+    def __init__(self, memory: Memory, push: PushFn) -> None:
         self._memory = memory
         self._push = push
         self._task: asyncio.Task | None = None
@@ -33,10 +38,8 @@ class ReminderService:
     async def stop(self) -> None:
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def _run(self) -> None:
@@ -50,15 +53,18 @@ class ReminderService:
             await asyncio.sleep(POLL_SECONDS)
 
     async def _tick(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for row in self._memory.pending_reminders(until=now):
             log.info("firing reminder %s: %s", row["id"], row["text"])
             await self._push(row["text"])
             self._memory.mark_fired(row["id"])
 
             repeat = (row["repeat"] or "").lower()
-            delta = {"daily": timedelta(days=1), "weekly": timedelta(weeks=1),
-                     "hourly": timedelta(hours=1)}.get(repeat)
+            delta = {
+                "daily": timedelta(days=1),
+                "weekly": timedelta(weeks=1),
+                "hourly": timedelta(hours=1),
+            }.get(repeat)
             if delta:
                 fire_at = datetime.fromisoformat(row["fire_at"]) + delta
                 # If the server was off for a while, roll forward to the next

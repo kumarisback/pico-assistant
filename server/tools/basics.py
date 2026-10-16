@@ -13,12 +13,27 @@ from . import Tool, ToolContext
 log = logging.getLogger(__name__)
 
 WEATHER_CODES = {
-    0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
-    45: "fog", 48: "freezing fog", 51: "light drizzle", 53: "drizzle",
-    55: "heavy drizzle", 61: "light rain", 63: "rain", 65: "heavy rain",
-    71: "light snow", 73: "snow", 75: "heavy snow", 80: "rain showers",
-    81: "heavy rain showers", 82: "violent rain showers",
-    95: "thunderstorm", 96: "thunderstorm with hail", 99: "severe thunderstorm with hail",
+    0: "clear sky",
+    1: "mainly clear",
+    2: "partly cloudy",
+    3: "overcast",
+    45: "fog",
+    48: "freezing fog",
+    51: "light drizzle",
+    53: "drizzle",
+    55: "heavy drizzle",
+    61: "light rain",
+    63: "rain",
+    65: "heavy rain",
+    71: "light snow",
+    73: "snow",
+    75: "heavy snow",
+    80: "rain showers",
+    81: "heavy rain showers",
+    82: "violent rain showers",
+    95: "thunderstorm",
+    96: "thunderstorm with hail",
+    99: "severe thunderstorm with hail",
 }
 
 

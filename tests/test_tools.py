@@ -6,8 +6,7 @@ Run with:  python -m pytest tests -q
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -28,8 +27,7 @@ class FakeMemory:
         rid = self._next
         self._next += 1
         self.rows.append(
-            {"id": rid, "fire_at": fire_at.isoformat(), "text": text,
-             "repeat": repeat, "fired": 0}
+            {"id": rid, "fire_at": fire_at.isoformat(), "text": text, "repeat": repeat, "fired": 0}
         )
         return rid
 
@@ -55,7 +53,7 @@ def ctx() -> ToolContext:
 def test_relative_offset_is_in_the_future(ctx):
     fire_at, error = _resolve_time(ctx, in_minutes=10, at=None)
     assert error == ""
-    assert fire_at > datetime.now(timezone.utc)
+    assert fire_at > datetime.now(UTC)
 
 
 def test_past_clock_time_rolls_to_tomorrow(ctx):

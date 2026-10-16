@@ -26,6 +26,7 @@ import contextlib
 import json
 import logging
 import secrets
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -46,7 +47,7 @@ log = logging.getLogger("assistant")
 
 cfg = Config.load()
 state: dict = {}
-sessions: set["Session"] = set()
+sessions: set[Session] = set()
 
 
 async def broadcast_push(text: str) -> None:
@@ -59,7 +60,7 @@ async def broadcast_push(text: str) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log.info("loading models (this takes ~20s on first run)")
     memory = Memory(cfg)
     registry = build_registry(ToolContext(cfg=cfg, memory=memory))
@@ -162,15 +163,13 @@ async def authenticate(ws: WebSocket) -> str | None:
     try:
         raw = await asyncio.wait_for(ws.receive_text(), timeout=10)
         hello = json.loads(raw)
-    except (asyncio.TimeoutError, json.JSONDecodeError, WebSocketDisconnect):
+    except (TimeoutError, json.JSONDecodeError, WebSocketDisconnect):
         return None
 
     if hello.get("type") != "hello":
         return None
     # compare_digest: the endpoint is reachable over a public tunnel.
-    if not secrets.compare_digest(
-        str(hello.get("token", "")), str(cfg["server"]["auth_token"])
-    ):
+    if not secrets.compare_digest(str(hello.get("token", "")), str(cfg["server"]["auth_token"])):
         log.warning("rejected connection with bad token")
         return None
     return str(hello.get("device_id", "unknown"))

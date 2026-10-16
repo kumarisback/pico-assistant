@@ -11,9 +11,13 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import onnxruntime as ort
+
+if TYPE_CHECKING:
+    from .config import Config
 
 log = logging.getLogger(__name__)
 
@@ -42,12 +46,11 @@ class Endpointer:
     neither of which can be shared across speakers.
     """
 
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg: Config) -> None:
         model_path = Path(cfg.path("vad", "model_path"))
         if not model_path.exists():
             raise FileNotFoundError(
-                f"silero VAD model missing at {model_path}. "
-                "Run scripts/download-models.sh first."
+                f"silero VAD model missing at {model_path}. Run scripts/download-models.sh first."
             )
 
         opts = ort.SessionOptions()
@@ -66,9 +69,9 @@ class Endpointer:
         self._preroll_bytes = int(v["preroll_ms"]) * SAMPLE_RATE // 1000 * 2
 
         self._state = np.zeros((2, 1, 128), dtype=np.float32)
-        self._pending = bytearray()      # leftover samples not yet forming a window
-        self._preroll = bytearray()      # rolling pre-speech audio
-        self._utterance = bytearray()    # captured speech
+        self._pending = bytearray()  # leftover samples not yet forming a window
+        self._preroll = bytearray()  # rolling pre-speech audio
+        self._utterance = bytearray()  # captured speech
         self._speech_windows = 0
         self._silence_run = 0
         self._total_windows = 0

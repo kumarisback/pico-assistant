@@ -7,7 +7,7 @@ done here.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from dateutil import parser as date_parser
@@ -63,7 +63,7 @@ async def schedule(
         return error
 
     reminder_id = ctx.memory.add_reminder(
-        fire_at.astimezone(timezone.utc), what, "" if repeat == "none" else repeat
+        fire_at.astimezone(UTC), what, "" if repeat == "none" else repeat
     )
     when = fire_at.strftime("%I:%M %p on %A %d %B").lstrip("0")
     suffix = "" if repeat == "none" else f", repeating {repeat}"
@@ -72,7 +72,7 @@ async def schedule(
 
 async def list_schedule(ctx: ToolContext, days: int = 7) -> str:
     tz = _local_tz(ctx)
-    horizon = datetime.now(timezone.utc) + timedelta(days=int(days))
+    horizon = datetime.now(UTC) + timedelta(days=int(days))
     rows = ctx.memory.pending_reminders(until=horizon)
     if not rows:
         return f"Nothing scheduled in the next {days} days."
