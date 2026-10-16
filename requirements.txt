@@ -1,0 +1,31 @@
+# Deliberately torch-free: everything heavy runs on onnxruntime or CTranslate2.
+# Installing torch would cost ~2 GB of RAM you do not have on an 8 GB machine.
+
+# --- server ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+websockets==14.1
+pydantic==2.10.4
+PyYAML==6.0.2
+httpx==0.28.1
+
+# --- speech ---
+faster-whisper==1.1.1          # CTranslate2 backend, no torch
+onnxruntime==1.20.1            # silero VAD + piper + embeddings
+piper-tts==1.2.0
+numpy==2.2.1
+
+# --- memory / embeddings ---
+fastembed==0.5.1               # ONNX embeddings, no torch
+
+# --- tools ---
+ddgs==9.0.0                    # keyless web search
+trafilatura==2.0.0             # article text extraction for fetch_page
+python-dateutil==2.9.0.post0
+
+# --- test client (laptop mic, stands in for the ESP32) ---
+sounddevice==0.5.1
+
+# --- dev ---
+pytest==8.3.4
+pytest-asyncio==0.25.2

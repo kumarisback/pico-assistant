@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Model weights — re-fetch with scripts/download-models.sh
+# Pattern is dir/* not dir/, so the .gitkeep negation below still applies.
+models/*
+!models/.gitkeep
+
+# SQLite memory — personal data, never commit
+data/*
+!data/.gitkeep
+
+.env
+*.log
+.DS_Store
+
+# stray artifact from the Claude Code session hook
+.agent/

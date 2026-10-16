@@ -1,0 +1,85 @@
+# Assistant configuration.
+# Tuned for: Acer Nitro 5, GTX 1050 Ti (4 GB VRAM), 8 GB RAM.
+# Every path is relative to the project root unless absolute.
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  # Shared secret the ESP32 (and mic_client) must send in the "hello" frame.
+  # Override with ASSISTANT_TOKEN env var. Never leave this empty on a public tunnel.
+  auth_token: "change-me"
+
+audio:
+  sample_rate: 16000      # ESP32 I2S mic rate. Everything upstream assumes this.
+  frame_ms: 20            # 320 samples = 640 bytes per PCM16 frame
+  channels: 1
+
+vad:
+  # silero-vad v5 ONNX. Runs on CPU, ~1 ms per 32 ms window.
+  model_path: "models/silero_vad.onnx"
+  threshold: 0.5          # speech probability above which a frame counts as speech
+  min_speech_ms: 250      # ignore blips shorter than this
+  silence_ms: 700         # end-of-utterance after this much trailing silence
+  max_utterance_ms: 20000 # hard cap so a noisy room cannot hang the pipeline
+  preroll_ms: 300         # audio kept from before speech was detected
+
+stt:
+  model: "base.en"        # English-only. As accurate as large-v3 on clean English.
+  device: "cuda"          # "cpu" to free VRAM entirely
+  # int8 (not int8_float16): Pascal runs fp16 at 1/64 rate, so fp16 is a trap here.
+  compute_type: "int8"
+  beam_size: 1            # greedy — latency matters more than the last 1% WER
+  download_root: "models/whisper"
+
+llm:
+  # llama-server (llama.cpp) OpenAI-compatible endpoint. Start it with scripts/run-llama.sh
+  base_url: "http://127.0.0.1:8081/v1"
+  model: "qwen3-4b-instruct"
+  temperature: 0.4
+  max_tokens: 512
+  # Hard ceiling on tool-call round trips for one user turn.
+  max_tool_rounds: 4
+  request_timeout_s: 120
+
+tts:
+  # Piper ONNX voice. Runs on CPU at ~100x realtime.
+  voice_path: "models/piper/en_US-amy-medium.onnx"
+  config_path: "models/piper/en_US-amy-medium.onnx.json"
+  length_scale: 1.0       # >1 slower speech, <1 faster
+  noise_scale: 0.667
+  noise_w: 0.8
+
+memory:
+  db_path: "data/assistant.db"
+  # fastembed model (ONNX, CPU). 130 MB, no torch.
+  embed_model: "BAAI/bge-small-en-v1.5"
+  embed_cache_dir: "models/fastembed"
+  recall_top_k: 5
+  recall_min_score: 0.35
+  history_turns: 10       # conversation turns kept in the prompt
+
+tools:
+  search:
+    max_results: 5
+    # Optional self-hosted SearxNG. If empty, DuckDuckGo (ddgs) is used.
+    searxng_url: ""
+  fetch:
+    max_chars: 6000
+    timeout_s: 15
+  weather:
+    # Open-Meteo needs no API key. Default location used when the user omits one.
+    default_place: "Pune, India"
+    latitude: 18.5204
+    longitude: 73.8567
+    timezone: "Asia/Kolkata"
+
+persona:
+  name: "Pico"
+  # Spoken output is read aloud, so the style rules are strict about length.
+  style: |
+    You are Pico, a spoken voice assistant. Your replies are converted to speech.
+    - Keep replies under 40 words unless the user asks for detail.
+    - Plain conversational English. No markdown, no bullet points, no emoji.
+    - Write numbers, dates and units the way a person would say them aloud.
+    - If you used a tool, state the answer directly. Do not narrate the tool call.
+    - If you do not know something, use a tool. Never invent facts, dates or numbers.
