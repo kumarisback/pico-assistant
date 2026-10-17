@@ -110,7 +110,18 @@ class Endpointer:
             del self._pending[:window_bytes]
 
             samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
-            is_speech = self._probability(samples) >= self._threshold
+            prob = self._probability(samples)
+            is_speech = prob >= self._threshold
+
+            if prob >= 0.05:
+                log.info(
+                    "VAD prob: %.3f (thr: %.2f, win: %d/%d, in_speech: %s)",
+                    prob,
+                    self._threshold,
+                    self._speech_windows,
+                    self._min_speech_windows,
+                    self._in_speech,
+                )
 
             if self._in_speech:
                 self._utterance.extend(chunk)
@@ -121,6 +132,7 @@ class Endpointer:
                 else:
                     self._silence_run += 1
                     if self._silence_run >= self._silence_windows:
+                        log.info("silence reached (%d windows), ending utterance", self._silence_run)
                         return VadResult(VadEvent.SPEECH_END, self._take_utterance())
 
                 if self._total_windows >= self._max_windows:
@@ -142,7 +154,7 @@ class Endpointer:
                         self._total_windows = 0
                         event = VadEvent.SPEECH_START
                 else:
-                    self._speech_windows = 0
+                    self._speech_windows = max(0, self._speech_windows - 1)
 
         return VadResult(event)
 

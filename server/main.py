@@ -201,8 +201,11 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             if (payload := message.get("bytes")) is not None:
                 result = session.endpointer.push(payload)
                 if result.event is VadEvent.SPEECH_START:
+                    log.info("[%s] speech detected", device_id)
                     await session.stop_speaking()
+                    await session.send_state("hearing you...")
                 elif result.event in (VadEvent.SPEECH_END, VadEvent.TIMEOUT):
+                    log.info("[%s] speech finished (event: %s)", device_id, result.event.value)
                     await session.handle_utterance(result.audio)
 
             elif (payload := message.get("text")) is not None:

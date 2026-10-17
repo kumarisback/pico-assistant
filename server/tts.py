@@ -69,8 +69,11 @@ class Speaker:
         }
 
     def _synth_sync(self, text: str) -> bytes:
-        chunks: Iterator[bytes] = self._voice.synthesize_stream_raw(text, **self._synth_args)
-        raw = b"".join(chunks)
+        if hasattr(self._voice, "synthesize_stream_raw"):
+            chunks: Iterator[bytes] = self._voice.synthesize_stream_raw(text, **self._synth_args)
+            raw = b"".join(chunks)
+        else:
+            raw = b"".join(chunk.audio_int16_bytes for chunk in self._voice.synthesize(text))
         if not raw:
             return b""
         pcm = np.frombuffer(raw, dtype=np.int16)

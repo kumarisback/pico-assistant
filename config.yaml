@@ -17,9 +17,9 @@ audio:
 vad:
   # silero-vad v5 ONNX. Runs on CPU, ~1 ms per 32 ms window.
   model_path: "models/silero_vad.onnx"
-  threshold: 0.5          # speech probability above which a frame counts as speech
-  min_speech_ms: 250      # ignore blips shorter than this
-  silence_ms: 700         # end-of-utterance after this much trailing silence
+  threshold: 0.05         # very low threshold for laptop mic with low signal
+  min_speech_ms: 64       # 2 windows (64ms) to trigger speech detection
+  silence_ms: 600         # end-of-utterance after this much trailing silence
   max_utterance_ms: 20000 # hard cap so a noisy room cannot hang the pipeline
   preroll_ms: 300         # audio kept from before speech was detected
 
@@ -32,9 +32,9 @@ stt:
   download_root: "models/whisper"
 
 llm:
-  # llama-server (llama.cpp) OpenAI-compatible endpoint. Start it with scripts/run-llama.sh
-  base_url: "http://127.0.0.1:8081/v1"
-  model: "qwen3-4b-instruct"
+  # llama-server (llama.cpp) or Ollama OpenAI-compatible endpoint.
+  base_url: "http://127.0.0.1:11434/v1"
+  model: "qwen2.5:3b"
   temperature: 0.4
   max_tokens: 512
   # Hard ceiling on tool-call round trips for one user turn.
