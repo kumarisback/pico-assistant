@@ -32,9 +32,15 @@ class Config:
         if token:
             raw["server"]["auth_token"] = token
 
+        # base_url and model travel together — switching between Ollama and
+        # llama-server changes both, so both must be overridable per machine.
         base_url = os.environ.get("LLAMA_BASE_URL")
         if base_url:
             raw["llm"]["base_url"] = base_url
+
+        model = os.environ.get("LLM_MODEL")
+        if model:
+            raw["llm"]["model"] = model
 
         return cls(raw=raw)
 

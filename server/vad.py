@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 WINDOW_SAMPLES = 512
+CONTEXT_SAMPLES = 64
 SAMPLE_RATE = 16000
 WINDOW_MS = WINDOW_SAMPLES * 1000 // SAMPLE_RATE  # 32
 
@@ -46,20 +47,22 @@ class Endpointer:
     neither of which can be shared across speakers.
     """
 
-    def __init__(self, cfg: Config) -> None:
-        model_path = Path(cfg.path("vad", "model_path"))
+    def _load_session(self, model_path: Path) -> ort.InferenceSession:
+        """Separated so tests can substitute a stub and skip the model file."""
         if not model_path.exists():
             raise FileNotFoundError(
                 f"silero VAD model missing at {model_path}. Run scripts/download-models.sh first."
             )
-
         opts = ort.SessionOptions()
         opts.inter_op_num_threads = 1
         opts.intra_op_num_threads = 1
         opts.log_severity_level = 3
-        self._session = ort.InferenceSession(
+        return ort.InferenceSession(
             str(model_path), sess_options=opts, providers=["CPUExecutionProvider"]
         )
+
+    def __init__(self, cfg: Config) -> None:
+        self._session = self._load_session(Path(cfg.path("vad", "model_path")))
 
         v = cfg["vad"]
         self._threshold = float(v["threshold"])
@@ -69,6 +72,7 @@ class Endpointer:
         self._preroll_bytes = int(v["preroll_ms"]) * SAMPLE_RATE // 1000 * 2
 
         self._state = np.zeros((2, 1, 128), dtype=np.float32)
+        self._context = np.zeros(CONTEXT_SAMPLES, dtype=np.float32)
         self._pending = bytearray()  # leftover samples not yet forming a window
         self._preroll = bytearray()  # rolling pre-speech audio
         self._utterance = bytearray()  # captured speech
@@ -80,6 +84,7 @@ class Endpointer:
     def reset(self) -> None:
         """Clear per-utterance state. RNN state is reset too: it is utterance-scoped."""
         self._state = np.zeros((2, 1, 128), dtype=np.float32)
+        self._context = np.zeros(CONTEXT_SAMPLES, dtype=np.float32)
         self._pending.clear()
         self._preroll.clear()
         self._utterance.clear()
@@ -89,14 +94,19 @@ class Endpointer:
         self._in_speech = False
 
     def _probability(self, window: np.ndarray) -> float:
+        # Silero v5 expects the previous 64 samples prepended to each 512-sample
+        # window (576 total). Without them the model returns near-zero on clear
+        # speech — it never crosses any usable threshold.
+        padded = np.concatenate((self._context, window))
         out, self._state = self._session.run(
             None,
             {
-                "input": window.reshape(1, -1),
+                "input": padded.reshape(1, -1),
                 "state": self._state,
                 "sr": np.array(SAMPLE_RATE, dtype=np.int64),
             },
         )
+        self._context = window[-CONTEXT_SAMPLES:]
         return float(out[0][0])
 
     def push(self, pcm: bytes) -> VadResult:
@@ -113,16 +123,6 @@ class Endpointer:
             prob = self._probability(samples)
             is_speech = prob >= self._threshold
 
-            if prob >= 0.05:
-                log.info(
-                    "VAD prob: %.3f (thr: %.2f, win: %d/%d, in_speech: %s)",
-                    prob,
-                    self._threshold,
-                    self._speech_windows,
-                    self._min_speech_windows,
-                    self._in_speech,
-                )
-
             if self._in_speech:
                 self._utterance.extend(chunk)
                 self._total_windows += 1
@@ -132,7 +132,6 @@ class Endpointer:
                 else:
                     self._silence_run += 1
                     if self._silence_run >= self._silence_windows:
-                        log.info("silence reached (%d windows), ending utterance", self._silence_run)
                         return VadResult(VadEvent.SPEECH_END, self._take_utterance())
 
                 if self._total_windows >= self._max_windows:

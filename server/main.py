@@ -202,8 +202,9 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 result = session.endpointer.push(payload)
                 if result.event is VadEvent.SPEECH_START:
                     log.info("[%s] speech detected", device_id)
+                    # No state frame here — the protocol only defines
+                    # listening/thinking/speaking, and we are already listening.
                     await session.stop_speaking()
-                    await session.send_state("hearing you...")
                 elif result.event in (VadEvent.SPEECH_END, VadEvent.TIMEOUT):
                     log.info("[%s] speech finished (event: %s)", device_id, result.event.value)
                     await session.handle_utterance(result.audio)

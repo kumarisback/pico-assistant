@@ -1,6 +1,9 @@
 .PHONY: help setup models models-llm llama server chat mic test lint fmt clean
 
-PY ?= python3.12
+# 3.12 then 3.11 — onnxruntime/faster-whisper/piper-tts do not all ship wheels
+# for 3.13+. Falling back to a bare python3 there installs mismatched versions
+# silently, so fail loudly instead. Override with: make setup PY=/path/to/python
+PY ?= $(shell command -v python3.12 || command -v python3.11)
 VENV := .venv
 BIN := $(VENV)/bin
 
@@ -8,6 +11,11 @@ help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 setup:  ## create venv and install dependencies
+	@test -n "$(PY)" || { \
+	  echo "No python3.12 or python3.11 found."; \
+	  echo "  macOS:  brew install python@3.12"; \
+	  echo "  Ubuntu: sudo apt install python3.12-venv"; \
+	  exit 1; }
 	$(PY) -m venv $(VENV)
 	$(BIN)/pip install --upgrade pip wheel
 	$(BIN)/pip install -r requirements.txt

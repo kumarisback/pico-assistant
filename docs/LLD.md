@@ -85,16 +85,26 @@ Client's first frame must be text:
 
 ### silero constraints
 
-The v5 ONNX model accepts **only** 512-sample windows at 16 kHz (32 ms).
-Incoming frames are 320 samples, so windows are reassembled from a byte buffer.
+The v5 ONNX model scores **only** 512-sample windows at 16 kHz (32 ms), and each
+window must be prefixed with the **last 64 samples of the previous window** —
+576 float32 values in total. Incoming frames are 320 samples, so windows are
+reassembled from a byte buffer and the 64-sample context is carried forward.
 
 ```
-inputs:  input (1,512) float32, state (2,1,128) float32, sr int64
+inputs:  input (1,576) float32, state (2,1,128) float32, sr int64
+         └─ 64 context samples ++ 512 new samples
 outputs: probability (1,1),     new state
 ```
 
-`state` is a recurrent hidden state. It is per-speaker and per-utterance, so each
-connection owns an `Endpointer` instance and resets state between utterances.
+The input tensor is declared `(None, None)`, so passing a bare 512 is accepted
+silently — it just returns garbage. Measured on clean speech: with the context
+the peak probability is 1.00; without it, 0.065, which never crosses any usable
+threshold. **This failure mode is invisible without a known-good audio fixture**,
+which is why `tests/test_vad.py` asserts the 576-sample shape directly.
+
+`state` is a recurrent hidden state. Along with the 64-sample context it is
+per-speaker and per-utterance, so each connection owns an `Endpointer` instance
+and `reset()` clears both between utterances.
 
 ### State machine
 
@@ -127,8 +137,13 @@ so Whisper sees the complete word.
 ## 5. `stt.py` — transcription
 
 ```python
-WhisperModel("base.en", device="cuda", compute_type="int8")
+WhisperModel("base.en", device=_resolve_device("auto"), compute_type="int8")
 ```
+
+`stt.device: auto` probes `ctranslate2.get_cuda_device_count()` and falls back
+to CPU. CTranslate2 has no Metal backend, so macOS always resolves to CPU. A
+failed GPU load is additionally caught and retried on CPU, because a driver
+mismatch should degrade the assistant, not kill it.
 
 Runs inside `asyncio.to_thread` — CTranslate2 releases the GIL, and the event
 loop must keep draining the socket or the client's send buffer backs up.

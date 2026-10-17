@@ -94,6 +94,50 @@ make chat       # 3. type to it
 make mic        #    or talk to it
 ```
 
+### macOS
+
+```bash
+brew install python@3.12 ollama      # 3.13+ has no wheels for onnxruntime/piper
+brew services start ollama
+ollama pull qwen2.5:3b
+
+cd ~/workspace/assistant
+make setup                           # venv + deps + VAD/TTS models
+make server                          # terminal 1
+make mic                             # terminal 2 — or `make chat` to type
+```
+
+No `make llama` on a Mac — Ollama replaces it, and `config.yaml` already points
+at `127.0.0.1:11434`. Whisper runs on CPU (see below), roughly a second per
+utterance. Grant microphone permission to your terminal app on the first run:
+**System Settings → Privacy & Security → Microphone**.
+
+> Model weights come from `huggingface.co` and `registry.ollama.ai`. Corporate
+> networks that run an SSL-inspecting proxy (Zscaler and similar) return
+> `403` for both, and the download fails with a block page instead of a model.
+> Fetch the models once on a home network or a phone hotspot — afterwards they
+> are on disk and the assistant runs fully offline.
+
+### Platforms
+
+The same checkout runs on Linux, Windows and macOS — there is no OS flag.
+`stt.device: auto` resolves to CUDA when the machine has it and CPU otherwise,
+so a Mac (no CUDA, and CTranslate2 has no Metal backend) lands on CPU
+automatically. Whisper `base.en` on CPU is around a second per utterance.
+
+The LLM backend is the only thing that differs, and it is two env vars:
+
+| Machine | Backend | Override |
+|---|---|---|
+| Nitro (CUDA) | llama.cpp | `LLAMA_BASE_URL=http://127.0.0.1:8081/v1 LLM_MODEL=qwen3-4b-instruct` |
+| Mac / Windows | Ollama | none — this is the `config.yaml` default |
+
+On a laptop the mic client is **half-duplex**: the microphone is muted while the
+assistant speaks, because laptop speakers feed straight back into the laptop
+microphone and the assistant otherwise interrupts itself. Pass `--barge-in` to
+keep the mic open — only useful with headphones, or on the ESP32 where the mic
+and speaker are physically separated.
+
 Start with `chat_client`. It skips STT and TTS entirely, so when something is
 wrong you immediately know whether it is the audio path or the agent.
 

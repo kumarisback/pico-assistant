@@ -29,9 +29,10 @@ async def run(
     url: str,
     token: str,
     device_id: str,
-    gain: float = 15.0,
+    gain: float = 1.0,
     input_device: int | None = None,
     output_device: int | None = None,
+    half_duplex: bool = True,
 ) -> None:
     mic_q: queue.Queue[bytes] = queue.Queue()
     last_meter_time = 0.0
@@ -41,6 +42,12 @@ async def run(
         nonlocal last_meter_time
         if status:
             print(f"\n[mic status: {status}]", file=sys.stderr, flush=True)
+
+        # Laptop mic + laptop speaker share a room: without this the assistant
+        # hears its own voice and interrupts itself. Dropped at the source so
+        # the queue does not build a backlog to replay afterwards.
+        if half_duplex and current_state == "speaking":
+            return
 
         if gain != 1.0:
             arr = np.frombuffer(indata, dtype=np.int16).astype(np.float32) * gain
@@ -82,7 +89,7 @@ async def run(
             device=input_device,
         )
         mic.start()
-        print(f"Connected! (Gain: {gain}x) Listening - talk into your microphone. Ctrl+C to quit.\n", flush=True)
+        print(f"Connected (gain {gain}x). Talk into your microphone. Ctrl+C to quit.\n", flush=True)
 
         async def send_mic() -> None:
             loop = asyncio.get_running_loop()
@@ -94,7 +101,9 @@ async def run(
             nonlocal current_state
             async for message in ws:
                 if isinstance(message, bytes):
-                    speaker.write(message)
+                    # RawOutputStream.write blocks until the ring buffer drains.
+                    # Calling it inline stalls the event loop and backs the mic up.
+                    await asyncio.to_thread(speaker.write, message)
                     continue
 
                 msg = json.loads(message)
@@ -126,10 +135,15 @@ def main() -> None:
     parser.add_argument("--url", default="ws://127.0.0.1:8080/ws")
     parser.add_argument("--token", default=os.environ.get("ASSISTANT_TOKEN", "change-me"))
     parser.add_argument("--device-id", default="laptop-mic")
-    parser.add_argument("--gain", type=float, default=15.0, help="Microphone digital gain multiplier (default: 15.0)")
-    parser.add_argument("--input-device", type=int, default=None, help="Input device index from --list-devices")
-    parser.add_argument("--output-device", type=int, default=None, help="Output device index from --list-devices")
+    parser.add_argument("--gain", type=float, default=1.0, help="mic digital gain multiplier")
+    parser.add_argument("--input-device", type=int, default=None, help="index from --list-devices")
+    parser.add_argument("--output-device", type=int, default=None, help="index from --list-devices")
     parser.add_argument("--list-devices", action="store_true", help="show audio devices and exit")
+    parser.add_argument(
+        "--barge-in",
+        action="store_true",
+        help="keep the mic open while the assistant speaks (needs headphones)",
+    )
     args = parser.parse_args()
 
     if args.list_devices:
@@ -145,6 +159,7 @@ def main() -> None:
                 gain=args.gain,
                 input_device=args.input_device,
                 output_device=args.output_device,
+                half_duplex=not args.barge_in,
             )
         )
     except KeyboardInterrupt:

@@ -62,18 +62,39 @@ class Speaker:
         self._frame_bytes = cfg.frame_bytes
 
         t = cfg["tts"]
-        self._synth_args = {
-            "length_scale": float(t["length_scale"]),
-            "noise_scale": float(t["noise_scale"]),
-            "noise_w": float(t["noise_w"]),
-        }
+        length, noise, noise_w = (
+            float(t["length_scale"]),
+            float(t["noise_scale"]),
+            float(t["noise_w"]),
+        )
+
+        # piper-tts >= 1.3 replaced synthesize_stream_raw(**kwargs) with
+        # synthesize(text, SynthesisConfig) yielding AudioChunk, and renamed
+        # noise_w -> noise_w_scale. Both APIs are in the wild, so pick once here
+        # instead of branching per sentence — and never silently drop the knobs.
+        self._legacy_api = hasattr(self._voice, "synthesize_stream_raw")
+        if self._legacy_api:
+            self._synth_args = {
+                "length_scale": length,
+                "noise_scale": noise,
+                "noise_w": noise_w,
+            }
+        else:
+            from piper.config import SynthesisConfig
+
+            self._syn_config = SynthesisConfig(
+                length_scale=length, noise_scale=noise, noise_w_scale=noise_w
+            )
 
     def _synth_sync(self, text: str) -> bytes:
-        if hasattr(self._voice, "synthesize_stream_raw"):
+        if self._legacy_api:
             chunks: Iterator[bytes] = self._voice.synthesize_stream_raw(text, **self._synth_args)
             raw = b"".join(chunks)
         else:
-            raw = b"".join(chunk.audio_int16_bytes for chunk in self._voice.synthesize(text))
+            raw = b"".join(
+                chunk.audio_int16_bytes
+                for chunk in self._voice.synthesize(text, syn_config=self._syn_config)
+            )
         if not raw:
             return b""
         pcm = np.frombuffer(raw, dtype=np.int16)

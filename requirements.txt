@@ -10,10 +10,12 @@ PyYAML==6.0.2
 httpx==0.28.1
 
 # --- speech ---
-faster-whisper==1.1.1          # CTranslate2 backend, no torch
-onnxruntime==1.20.1            # silero VAD + piper + embeddings
-piper-tts==1.2.0
-numpy==2.2.1
+# Lower-bounded, not pinned: exact pins silently resolve to something else on a
+# Python version with no matching wheel, which is how the Piper API drifted.
+faster-whisper>=1.1.1,<2       # CTranslate2 backend, no torch
+onnxruntime>=1.20.1,<2         # silero VAD + piper + embeddings
+piper-tts>=1.2.0,<2            # see server/tts.py — both 1.2 and 1.3 APIs supported
+numpy>=2.2.1,<3
 
 # --- memory / embeddings ---
 fastembed==0.5.1               # ONNX embeddings, no torch

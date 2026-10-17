@@ -15,17 +15,36 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+def _resolve_device(requested: str) -> str:
+    """Resolve "auto" to CUDA if this machine actually has it, else CPU.
+
+    Lets the same config.yaml run on the CUDA laptop, a Mac and a CI box.
+    CTranslate2 has no Metal backend, so a Mac always lands on CPU.
+    """
+    if requested != "auto":
+        return requested
+    try:
+        import ctranslate2
+
+        if ctranslate2.get_cuda_device_count() > 0:
+            return "cuda"
+    except Exception as exc:  # noqa: BLE001 — probing must never be fatal
+        log.debug("CUDA probe failed: %s", exc)
+    return "cpu"
+
+
 class Transcriber:
     def __init__(self, cfg: Config) -> None:
         s = cfg["stt"]
         self._beam_size = int(s["beam_size"])
         download_root = str(cfg.path("stt", "download_root"))
+        device = _resolve_device(str(s["device"]))
 
-        log.info("loading whisper %s on %s (%s)", s["model"], s["device"], s["compute_type"])
+        log.info("loading whisper %s on %s (%s)", s["model"], device, s["compute_type"])
         try:
             self._model = WhisperModel(
                 s["model"],
-                device=s["device"],
+                device=device,
                 compute_type=s["compute_type"],
                 download_root=download_root,
             )

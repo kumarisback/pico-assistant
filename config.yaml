@@ -17,22 +17,25 @@ audio:
 vad:
   # silero-vad v5 ONNX. Runs on CPU, ~1 ms per 32 ms window.
   model_path: "models/silero_vad.onnx"
-  threshold: 0.05         # very low threshold for laptop mic with low signal
-  min_speech_ms: 64       # 2 windows (64ms) to trigger speech detection
-  silence_ms: 600         # end-of-utterance after this much trailing silence
+  threshold: 0.5          # silero's own default; it is well calibrated
+  min_speech_ms: 250      # speech must persist this long before an utterance opens
+  silence_ms: 700         # end-of-utterance after this much trailing silence
   max_utterance_ms: 20000 # hard cap so a noisy room cannot hang the pipeline
   preroll_ms: 300         # audio kept from before speech was detected
 
 stt:
   model: "base.en"        # English-only. As accurate as large-v3 on clean English.
-  device: "cuda"          # "cpu" to free VRAM entirely
+  # "auto" picks CUDA when the machine has it (Nitro) and CPU otherwise (Mac, CI).
+  device: "auto"          # or force "cuda" / "cpu"
   # int8 (not int8_float16): Pascal runs fp16 at 1/64 rate, so fp16 is a trap here.
   compute_type: "int8"
   beam_size: 1            # greedy — latency matters more than the last 1% WER
   download_root: "models/whisper"
 
 llm:
-  # llama-server (llama.cpp) or Ollama OpenAI-compatible endpoint.
+  # Any OpenAI-compatible endpoint. Defaults to Ollama because it is one install
+  # on Windows and macOS. For the tuned llama.cpp path on the Nitro:
+  #   LLAMA_BASE_URL=http://127.0.0.1:8081/v1 LLM_MODEL=qwen3-4b-instruct
   base_url: "http://127.0.0.1:11434/v1"
   model: "qwen2.5:3b"
   temperature: 0.4
