@@ -2,6 +2,12 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
+
+# editable-install and build artifacts
+*.egg-info/
+build/
+dist/
 
 # Model weights — re-fetch with scripts/download-models.sh
 # Pattern is dir/* not dir/, so the .gitkeep negation below still applies.

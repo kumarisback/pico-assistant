@@ -20,13 +20,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      # Only the test extra: onnxruntime, piper and the model downloads are not
-      # needed for the offline suite and would dominate CI time.
+      # requirements-test.txt only — faster-whisper, piper and the model
+      # downloads are not needed for the offline suite and would dominate CI
+      # time. --no-deps keeps the heavy runtime requirements out.
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test]" --no-deps
-          python -m pip install pytest PyYAML python-dateutil numpy httpx
+          python -m pip install -e . --no-deps
+          python -m pip install -r requirements-test.txt
 
       - name: Run tests
         run: python -m pytest
@@ -38,5 +39,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install ruff==0.9.2
+      - run: python -m pip install -r requirements-dev.txt
       - run: ruff check .
+      - run: ruff format --check .
